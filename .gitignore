@@ -1,0 +1,9 @@
+# Ambiente virtuale
+.venv/
+
+# Cartella con i dati (video, ecc.)
+TEstVideo/
+
+# Altri file di sistema (opzionali ma consigliati)
+__pycache__/
+*.pyc
