@@ -2,7 +2,7 @@
 .venv/
 
 # Cartella con i dati (video, ecc.)
-TEstVideo/
+TestVideo/
 
 # Altri file di sistema (opzionali ma consigliati)
 __pycache__/
