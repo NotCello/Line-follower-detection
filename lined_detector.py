@@ -139,7 +139,7 @@ while cap.isOpened():
     # 3. Calcola la media delle linee (es. con np.polyfit o altri metodi) per trovare
     #    i parametri (m, q) di UNA linea sinistra e UNA linea destra.
     left_line_params = get_line_parameters(left_segment)
-    right_line_params = get_line_parameters(right_line_params)
+    right_line_params = get_line_parameters(right_Segment)
 
 
     # === PASSO 5: CALCOLO ERRORE DI STERZATA ===
@@ -148,35 +148,116 @@ while cap.isOpened():
     # 1. Calcola il 'centro_corsia'
     #    (media tra la posizione x della linea sx e dx, calcolate a una y fissa, es. in fondo allo schermo)
     #    centro_corsia = (x_sinistro + x_destro) / 2
+    # === PASSO 5: CALCOLO ERRORE DI STERZATA ===
     
-    # 2. Calcola il 'centro_auto' (è semplicemente la metà della larghezza del frame)
-    #    centro_auto = width / 2
+    # Inizializziamo i valori. Partiamo dal presupposto che il centro sia
+    # il centro dell'auto, così se non troviamo le linee, l'errore è 0.
+    centro_auto = width // 2 # Usiamo // per avere un intero
+    centro_corsia = centro_auto 
     
-    # 3. Calcola l'errore in pixel
-    #    errore_pixel = centro_corsia - centro_auto
-    
-    # 4. (Opzionale) Calcola l'angolo di sterzata (Controllo P)
-    #    Kp = 0.1 # Guadagno proporzionale (da regolare)
-    #    angolo_sterzata = Kp * errore_pixel
+    # Controlliamo di aver trovato ENTRAMBE le linee.
+    # Se ne manca una, non possiamo calcolare il centro e usiamo i valori di default.
+    if left_line_params is not None and right_line_params is not None:
+        
+        # Scegliamo una 'y' fissa dove calcolare le coordinate 'x'.
+        # La parte più in basso dello schermo è un buon punto.
+        y_riferimento = height 
+        
+        # Estraiamo i parametri m e b dalla linea SINISTRA
+        m_sinistro, b_sinistro = left_line_params
+        
+        # Estraiamo i parametri m e b dalla linea DESTRA
+        m_destro, b_destro = right_line_params
+        
+        # Calcoliamo le coordinate x usando la nostra equazione x = m*y + b
+        # Convertiamo in interi perché i pixel non possono essere decimali
+        x_sinistro = int((m_sinistro * y_riferimento) + b_sinistro)
+        x_destro = int((m_destro * y_riferimento) + b_destro)
+        
+        # Ora possiamo calcolare il centro della corsia
+        centro_corsia = (x_sinistro + x_destro) // 2
+        
+        # (Debug: puoi disegnare questi punti per vedere se sono corretti)
+        #cv2.circle(frame, (x_sinistro, y_riferimento), 10, (0, 255, 0), -1) # Verde
+        #cv2.circle(frame, (x_destro, y_riferimento), 10, (0, 0, 255), -1)   # Rosso
+        #cv2.circle(frame, (centro_corsia, y_riferimento), 10, (255, 0, 0), -1) # Blu
 
+    # Ora calcoliamo l'errore
+    errore_pixel = centro_corsia - centro_auto
+    
+    # (Opzionale) Calcola l'angolo di sterzata (Controllo P)
+    Kp = 0.1 # Guadagno proporzionale (da regolare)
+    angolo_sterzata = Kp * errore_pixel
 
-    # === PASSO 6: VISUALIZZAZIONE ===
-    # L'obiettivo è mostrare il nostro risultato sovrapposto al video originale.
+    # (Debug: stampa l'errore)
+    print(f"Errore Pixel: {errore_pixel}, Angolo: {angolo_sterzata:.2f}")
     
-    # 1. Crea un'immagine "overlay" vuota (np.zeros_like(frame))
-    #    overlay_image = np.zeros_like(frame)
+
+   # === PASSO 6: VISUALIZZAZIONE ===
     
-    # 2. Disegna le due linee (sx e dx) che hai calcolato sull'overlay (cv2.line)
+    # 1. Crea un'immagine "overlay" vuota (nera)
+    overlay_image = np.zeros_like(frame)
     
-    # 3. Disegna il centro corsia (es. linea blu) e il centro auto (es. linea rossa) (cv2.line)
+    # 2. Disegna le due linee (sx e dx) sull'overlay
     
-    # 4. Scrivi il valore di 'angolo_sterzata' sull'immagine (cv2.putText)
+    # Definiamo la Y superiore del nostro disegno (deve corrispondere alla Y del tuo ROI)
+    y_top_roi = int(height * 0.4) 
+    y_bottom = height
+
+    # Disegna la linea SINISTRA (se è stata trovata)
+    if left_line_params is not None:
+        m_left, b_left = left_line_params
+        # Calcoliamo i punti (x1, y1) e (x2, y2)
+        x1_left = int((m_left * y_bottom) + b_left)
+        x2_left = int((m_left * y_top_roi) + b_left)
+        # Disegniamo una linea verde spessa
+        cv2.line(overlay_image, (x1_left, y_bottom), (x2_left, y_top_roi), (0, 255, 0), 10)
+
+    # Disegna la linea DESTRA (se è stata trovata)
+    if right_line_params is not None:
+        m_right, b_right = right_line_params
+        # Calcoliamo i punti (x1, y1) e (x2, y2)
+        x1_right = int((m_right * y_bottom) + b_right)
+        x2_right = int((m_right * y_top_roi) + b_right)
+        # Disegniamo una linea verde spessa
+        cv2.line(overlay_image, (x1_right, y_bottom), (x2_right, y_top_roi), (0, 255, 0), 10)
+
+    # 3. Disegna il centro corsia (blu) e il centro auto (rosso)
+    #    (Disegniamo solo nella parte visibile del ROI)
     
-    # 5. Combina l'immagine 'frame' originale con l' 'overlay' (cv2.addWeighted)
-    #    risultato_finale = cv2.addWeighted(frame, 0.8, overlay_image, 1.0, 0)
+    # 3. Disegna il centro corsia (blu) e il centro auto (rosso)
+    
+    # Centro Auto (rosso) - è sempre fisso
+    cv2.line(overlay_image, (centro_auto, y_bottom), (centro_auto, y_top_roi), (0, 0, 255), 3) # ROSSO
+    
+    # Centro Corsia (blu) - CONDIZIONALE
+    # Disegna la linea blu SOLO se abbiamo trovato una corsia (cioè se è diversa dal centro auto)
+    if centro_corsia != centro_auto:
+        cv2.line(overlay_image, (centro_corsia, y_bottom), (centro_corsia, y_top_roi), (255, 0, 0), 3) # BLU
+    
+    # 5. Combina l'immagine 'frame' originale con l' 'overlay'
+    #    Questo crea l'effetto "trasparenza"
+    risultato_finale = cv2.addWeighted(frame, 0.8, overlay_image, 1.0, 0)
+    
+    
+    # 4. Scrivi il valore di 'angolo_sterzata' sull'immagine FINALE
+    #    (Lo facciamo *dopo* addWeighted così non è trasparente)
+    testo_angolo = f"Angolo Sterzata: {angolo_sterzata:.2f}"
+    cv2.putText(risultato_finale, testo_angolo, 
+                (50, 50), # Posizione (x, y) dall'angolo in alto a sinistra
+                cv2.FONT_HERSHEY_SIMPLEX, 
+                1, # Dimensione font
+                (255, 255, 255), # Colore (bianco)
+                2, # Spessore
+                cv2.LINE_AA)
     
     # 6. Mostra il 'risultato_finale'
-    #    cv2.imshow('Risultato', risultato_finale)
+    cv2.imshow('Risultato', risultato_finale)
+    
+    # --- FINE LOGICA DI ELABORAZIONE ---
+
+    # !!! IMPORTANTE: CANCELLA O COMMENTA la vecchia riga 'cv2.imshow'!!!
+    # cv2.imshow('Video Originale', frame)
     
     # Per ora, mostriamo solo il frame originale (CANCELLA/COMMENTA QUESTA RIGA QUANDO MOSTRI IL RISULTATO)
     cv2.imshow('Video Originale', masked_image) 
