@@ -3,18 +3,18 @@ import numpy as np
 
 def get_line_parameters(segments):
     """
-    Trova i parametri (m, b) per la retta x = m*y + b che meglio
-    approssima tutti i segmenti dati in input.
+    Finds the parameters (m, b) for the line x = m*y + b that best
+    approximates all input segments.
     """
-    # Liste per contenere TUTTI i punti
+    # Lists to hold ALL points
     x_coords = []
     y_coords = []
     
-    # Se la lista di segmenti è vuota, non fare nulla
+    # If the segment list is empty, do nothing
     if segments is None or len(segments) == 0:
         return None
 
-    # Scompatta tutti i punti
+    # Unpack all points
     for segment in segments:
         x1, y1, x2, y2 = segment[0]
         x_coords.append(x1)
@@ -22,249 +22,249 @@ def get_line_parameters(segments):
         y_coords.append(y1)
         y_coords.append(y2)
 
-    # Se non abbiamo punti (strano, ma meglio controllare)
+    # If we have no points (strange, but better to check)
     if not y_coords:
         return None
 
-    # Calcola la retta x = m*y + b
-    # Usiamo (y_coords, x_coords) perché y è la nostra variabile indipendente
+    # Calculate the line x = m*y + b
+    # We use (y_coords, x_coords) because y is our independent variable
     try:
-        params = np.polyfit(y_coords, x_coords, 1) # Grado = 1 (retta)
-        return params # Ritornerà [m, b]
+        params = np.polyfit(y_coords, x_coords, 1) # Degree = 1 (a line)
+        return params # Will return [m, b]
     except np.linalg.LinAlgError:
-        # Errore di calcolo, probabilmente linee perfettamente verticali
-        print("Errore Polyfit")
+        # Calculation error, probably perfectly vertical lines
+        print("Polyfit Error")
         return None
 
-# --- PASSO 0: SETUP E CARICAMENTO ---
+# --- STEP 0: SETUP AND LOADING ---
 
-# Carica il tuo video
-video_path = 'TestVideo/test_lane_detector.mp4' # Assicurati che il percorso e il nome siano corretti
+# Load your video
+video_path = 'TestVideo/test_lane_detector.mp4' # Make sure the path and name are correct
 cap = cv2.VideoCapture(video_path)
 
 if not cap.isOpened():
-    print(f"Errore: Impossibile aprire il file video: {video_path}")
+    print(f"Error: Unable to open video file: {video_path}")
     exit()
 
 while cap.isOpened():
     ret, frame = cap.read()
 
     if not ret:
-        print("Fine del video.")
+        print("End of video.")
         break
 
-    # --- INIZIO LOGICA DI ELABORAZIONE (da applicare a 'frame') ---
+    # --- START OF PROCESSING LOGIC (to be applied to 'frame') ---
 
-    # === PASSO 1: PRE-PROCESSING (Preparare l'Immagine) ===
-    # L'obiettivo è creare un'immagine binaria (bianco/nero) con solo i bordi utili.
+    # === STEP 1: PRE-PROCESSING (Prepare the Image) ===
+    # The goal is to create a binary image (black/white) with only the useful edges.
     
-    # 1. Converti 'frame' in Scala di Grigi (cv2.cvtColor)
+    # 1. Convert 'frame' to Grayscale (cv2.cvtColor)
     #    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray_image=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY )
     
-    # 2. Applica un Filtro Gaussiano (Blur) per rimuovere il rumore (cv2.GaussianBlur)
-    #    blur = cv2.GaussianBlur(gray, (5, 5), 0) # (5, 5) è la dimensione del kernel, deve essere dispari
+    # 2. Apply a Gaussian Filter (Blur) to remove noise (cv2.GaussianBlur)
+    #    blur = cv2.GaussianBlur(gray, (5, 5), 0) # (5, 5) is the kernel size, must be odd
     blur=cv2.GaussianBlur(gray_image,(5,5),0.2 )
     
-    # 3. Rilevamento Bordi con Canny (cv2.Canny)
-    #    canny = cv2.Canny(blur, 50, 150) # Dovrai regolare le soglie 50 e 150
+    # 3. Edge Detection with Canny (cv2.Canny)
+    #    canny = cv2.Canny(blur, 50, 150) # You will need to adjust the 50 and 150 thresholds
     canny=cv2.Canny(blur,50,150)
-    # 4. (Opzionale) Mostra l'output di Canny per il debug
+    # 4. (Optional) Show Canny output for debugging
     cv2.imshow('Canny Output', canny)
 
 
-    # === PASSO 2: REGION OF INTEREST (ROI) ===
-    # L'obiettivo è "ritagliare" solo la porzione di strada che ci interessa.
+    # === STEP 2: REGION OF INTEREST (ROI) ===
+    # The goal is to "crop" only the portion of the road we are interested in.
     
-    # 1. Definisci un poligono (trapezio) per la regione che ci interessa
-    #    (richiede l'altezza e la larghezza del frame)
+    # 1. Define a polygon (trapezoid) for the region of interest
+    #    (requires the frame's height and width)
     height, width = frame.shape[:2]
-    #    # I vertici (x, y) vanno regolati guardando il video!
+    #    # The vertices (x, y) must be adjusted by watching the video!
     polygon = np.array([
-        (0, height),              # Angolo in basso a sinistra
-        (width, height),          # Angolo in basso a destra
-        (width*0.55, height*0.5), # Punto in alto a destra della corsia (circa)
-        (width*0.45, height*0.5)  # Punto in alto a sinistra della corsia (circa)
+        (0, height),              # Bottom-left corner
+        (width, height),          # Bottom-right corner
+        (width*0.55, height*0.5), # Top-right point of the lane (approx)
+        (width*0.45, height*0.5)  # Top-left point of the lane (approx)
     ], dtype=np.int32)
     
-    # 2. Crea una maschera nera grande come l'immagine Canny (np.zeros_like)
+    # 2. Create a black mask as large as the Canny image (np.zeros_like)
     mask = np.zeros_like(canny)
     
-    # 3. "Riempì" il poligono sulla maschera con colore bianco (cv2.fillPoly)
+    # 3. "Fill" the polygon on the mask with white color (cv2.fillPoly)
     cv2.fillPoly(mask, [polygon], 255)
     
-    # 4. Applica la maschera all'immagine Canny (cv2.bitwise_and)
+    # 4. Apply the mask to the Canny image (cv2.bitwise_and)
     masked_image = cv2.bitwise_and(canny, mask)
     
-    # 5. (Opzionale) Mostra l'immagine mascherata per il debug
+    # 5. (Optional) Show the masked image for debugging
     cv2.imshow('ROI Output', masked_image)
 
 
-    # === PASSO 3: RILEVAMENTO LINEE (HOUGH TRANSFORM) ===
-    # L'obiettivo è trovare tutti i segmenti di linea retta nell'immagine ROI.
+    # === STEP 3: LINE DETECTION (HOUGH TRANSFORM) ===
+    # The goal is to find all straight-line segments in the ROI image.
     
     lines = cv2.HoughLinesP(masked_image, rho=2, theta=np.pi/180, threshold=50, minLineLength=20, maxLineGap=50)
-    # (Dovrai regolare 'threshold', 'minLineLength' e 'maxLineGap' per trovare le linee giuste)
+    # (You will need to adjust 'threshold', 'minLineLength', and 'maxLineGap' to find the right lines)
 
 
-    # === PASSO 4: LOGICA DI MEDIA E FILTRAGGIO ===
+    # === STEP 4: AVERAGING AND FILTERING LOGIC ===
     
     left_segment = []
     right_Segment = []
     
     if lines is not None:
-        # Inizia il loop: scorri OGNI linea trovata
+        # Start the loop: iterate over EVERY line found
         for line in lines: 
             x1,y1,x2,y2 = line[0]
 
             if (x2-x1) == 0:
-                continue # Salta questa linea se è verticale
+                continue # Skip this line if it's vertical
  
-            # QUESTO ORA È DENTRO IL LOOP 'for'
+            # THIS IS NOW INSIDE THE 'for' LOOP
             slope = (y2-y1) / (x2-x1)
 
-            # ANCHE QUESTO È DENTRO IL LOOP 'for'
-            # E CON LA LOGICA DELLA PENDENZA CORRETTA
-            if slope < -0.3: # Pendenza NEGATIVA = Linea SINISTRA
+            # THIS IS ALSO INSIDE THE 'for' LOOP
+            # AND WITH THE CORRECT SLOPE LOGIC
+            if slope < -0.3: # NEGATIVE slope = LEFT Line
                 left_segment.append(line)
-            elif slope > 0.3: # Pendenza POSITIVA = Linea DESTRA
+            elif slope > 0.3: # POSITIVE slope = RIGHT Line
                 right_Segment.append(line)
         
-        # Il loop 'for' finisce qui
+        # The 'for' loop ends here
 
-    # GUARDA QUESTO PRINT NEL TERMINALE!
-    print(f"segmenti Sinistri: {len(left_segment)}, Segmenti Destri: {len(right_Segment)}")
+    # LOOK AT THIS PRINT IN THE TERMINAL!
+    print(f"Left segments: {len(left_segment)}, Right segments: {len(right_Segment)}")
     
     left_line_params = get_line_parameters(left_segment)
     right_line_params = get_line_parameters(right_Segment)
 
-    # === PASSO 5: CALCOLO ERRORE DI STERZATA ===
-    # L'obiettivo è calcolare un numero che ci dica "quanto sterzare".
+    # === STEP 5: STEERING ERROR CALCULATION ===
+    # The goal is to calculate a number that tells us "how much to steer".
     
-    # 1. Calcola il 'centro_corsia'centro
-    #    (media tra la posizione x della linea sx e dx, calcolate a una y fissa, es. in fondo allo schermo)
-    #    centro_corsia = (x_sinistro + x_destro) / 2
-    # === PASSO 5: CALCOLO ERRORE DI STERZATA ===
+    # 1. Calculate the 'lane_center'
+    #    (average between the x position of the left and right lines, calculated at a fixed y, e.g., at the bottom of the screen)
+    #    lane_center = (x_left + x_right) / 2
+    # === STEP 5: STEERING ERROR CALCULATION ===
     
-    # Inizializziamo i valori. Partiamo dal presupposto che il centro sia
-    # il centro dell'auto, così se non troviamo le linee, l'errore è 0.
-    centro_auto = (width // 2) - 80 # Usiamo // per avere un intero
+    # Initialize the values. We assume the center is
+    # the car's center, so if we don't find lines, the error is 0.
+    centro_auto = (width // 2) - 80 # Use // for an integer
     centro_corsia = centro_auto 
     
-    # Controlliamo di aver trovato ENTRAMBE le linee.
-    # Se ne manca una, non possiamo calcolare il centro e usiamo i valori di default.
+    # We check if we found BOTH lines.
+    # If one is missing, we can't calculate the center and we use the default values.
     if left_line_params is not None and right_line_params is not None:
         
-        # Scegliamo una 'y' fissa dove calcolare le coordinate 'x'.
-        # La parte più in basso dello schermo è un buon punto.
+        # We choose a fixed 'y' to calculate the 'x' coordinates.
+        # The bottom of the screen is a good spot.
         y_riferimento = height 
         
-        # Estraiamo i parametri m e b dalla linea SINISTRA
+        # Extract the m and b parameters from the LEFT line
         m_sinistro, b_sinistro = left_line_params
         
-        # Estraiamo i parametri m e b dalla linea DESTRA
+        # Extract the m and b parameters from the RIGHT line
         m_destro, b_destro = right_line_params
         
-        # Calcoliamo le coordinate x usando la nostra equazione x = m*y + b
-        # Convertiamo in interi perché i pixel non possono essere decimali
+        # Calculate the x coordinates using our equation x = m*y + b
+        # We convert to integers because pixels cannot be decimals
         x_sinistro = int((m_sinistro * y_riferimento) + b_sinistro)
         x_destro = int((m_destro * y_riferimento) + b_destro)
         
-        # Ora possiamo calcolare il centro della corsia
+        # Now we can calculate the lane center
         centro_corsia = (x_sinistro + x_destro) // 2
         
-        # (Debug: puoi disegnare questi punti per vedere se sono corretti)
-        cv2.circle(frame, (x_sinistro, y_riferimento), 10, (0, 255, 0), -1) # Verde
-        cv2.circle(frame, (x_destro, y_riferimento), 10, (0, 0, 255), -1)   # Rosso
-        cv2.circle(frame, (centro_corsia, y_riferimento), 10, (255, 0, 0), -1) # Blu
+        # (Debug: you can draw these points to see if they are correct)
+        cv2.circle(frame, (x_sinistro, y_riferimento), 10, (0, 255, 0), -1) # Green
+        cv2.circle(frame, (x_destro, y_riferimento), 10, (0, 0, 255), -1)   # Red
+        cv2.circle(frame, (centro_corsia, y_riferimento), 10, (255, 0, 0), -1) # Blue
 
-    # Ora calcoliamo l'errore
+    # Now we calculate the error
     errore_pixel = centro_corsia - centro_auto
     
-    # (Opzionale) Calcola l'angolo di sterzata (Controllo P)
-    Kp = 0.1 # Guadagno proporzionale (da regolare)
+    # (Optional) Calculate the steering angle (P-Control)
+    Kp = 0.1 # Proportional gain (to be tuned)
     angolo_sterzata = Kp * errore_pixel
 
-    # (Debug: stampa l'errore)
-    print(f"Errore Pixel: {errore_pixel}, Angolo: {angolo_sterzata:.2f}")
+    # (Debug: print the error)
+    print(f"Pixel Error: {errore_pixel}, Angle: {angolo_sterzata:.2f}")
     
 
-   # === PASSO 6: VISUALIZZAZIONE ===
+   # === STEP 6: VISUALIZATION ===
     
-    # 1. Crea un'immagine "overlay" vuota (nera)
+    # 1. Create an empty (black) "overlay" image
     overlay_image = np.zeros_like(frame)
     
-    # 2. Disegna le due linee (sx e dx) sull'overlay
+    # 2. Draw the two lines (left and right) on the overlay
     
-    # Definiamo la Y superiore del nostro disegno (deve corrispondere alla Y del tuo ROI)
+    # We define the upper Y for our drawing (must match your ROI's Y)
     y_top_roi = int(height * 0.4) 
     y_bottom = height
 
-    # Disegna la linea SINISTRA (se è stata trovata)
+    # Draw the LEFT line (if it was found)
     if left_line_params is not None:
         m_left, b_left = left_line_params
-        # Calcoliamo i punti (x1, y1) e (x2, y2)
+        # Calculate the points (x1, y1) and (x2, y2)
         x1_left = int((m_left * y_bottom) + b_left)
         x2_left = int((m_left * y_top_roi) + b_left)
-        # Disegniamo una linea verde spessa
+        # Draw a thick green line
         cv2.line(overlay_image, (x1_left, y_bottom), (x2_left, y_top_roi), (0, 255, 0), 10)
 
-    # Disegna la linea DESTRA (se è stata trovata)
+    # Draw the RIGHT line (if it was found)
     if right_line_params is not None:
         m_right, b_right = right_line_params
-        # Calcoliamo i punti (x1, y1) e (x2, y2)
+        # Calculate the points (x1, y1) and (x2, y2)
         x1_right = int((m_right * y_bottom) + b_right)
         x2_right = int((m_right * y_top_roi) + b_right)
-        # Disegniamo una linea verde spessa
+        # Draw a thick green line
         cv2.line(overlay_image, (x1_right, y_bottom), (x2_right, y_top_roi), (0, 255, 0), 10)
 
-    # 3. Disegna il centro corsia (blu) e il centro auto (rosso)
-    #    (Disegniamo solo nella parte visibile del ROI)
+    # 3. Draw the lane center (blue) and the car center (red)
+    #    (We only draw in the visible part of the ROI)
     
-    # 3. Disegna il centro corsia (blu) e il centro auto (rosso)
+    # 3. Draw the lane center (blue) and the car center (red)
     
-    # Centro Auto (rosso) - è sempre fisso
-    cv2.line(overlay_image, (centro_auto, y_bottom), (centro_auto, y_top_roi), (0, 0, 255), 3) # ROSSO
+    # Car Center (red) - is always fixed
+    cv2.line(overlay_image, (centro_auto, y_bottom), (centro_auto, y_top_roi), (0, 0, 255), 3) # RED
     
-    # Centro Corsia (blu) - CONDIZIONALE
-    # Disegna la linea blu SOLO se abbiamo trovato una corsia (cioè se è diversa dal centro auto)
+    # Lane Center (blue) - CONDITIONAL
+    # Draw the blue line ONLY if we found a lane (i.e., if it's different from the car center)
     if centro_corsia != centro_auto:
-        cv2.line(overlay_image, (centro_corsia, y_bottom), (centro_corsia, y_top_roi), (255, 0, 0), 3) # BLU
+        cv2.line(overlay_image, (centro_corsia, y_bottom), (centro_corsia, y_top_roi), (255, 0, 0), 3) # BLUE
     
-    # 5. Combina l'immagine 'frame' originale con l' 'overlay'
-    #    Questo crea l'effetto "trasparenza"
+    # 5. Combine the original 'frame' image with the 'overlay'
+    #    This creates the "transparency" effect
     risultato_finale = cv2.addWeighted(frame, 0.8, overlay_image, 1.0, 0)
     
     
-    # 4. Scrivi il valore di 'angolo_sterzata' sull'immagine FINALE
-    #    (Lo facciamo *dopo* addWeighted così non è trasparente)
-    testo_angolo = f"Angolo Sterzata: {angolo_sterzata:.2f} Errore pixel: {errore_pixel}"
+    # 4. Write the 'steering_angle' value on the FINAL image
+    #    (We do this *after* addWeighted so it isn't transparent)
+    testo_angolo = f"Steering Angle: {angolo_sterzata:.2f} Pixel Error: {errore_pixel}"
     cv2.putText(risultato_finale, testo_angolo, 
-                (50, 50), # Posizione (x, y) dall'angolo in alto a sinistra
+                (50, 50), # Position (x, y) from the top-left corner
                 cv2.FONT_HERSHEY_SIMPLEX, 
-                1, # Dimensione font
-                (255, 255, 255), # Colore (bianco)
-                2, # Spessore
+                1, # Font size
+                (255, 255, 255), # Color (white)
+                2, # Thickness
                 cv2.LINE_AA)
     
-    # 6. Mostra il 'risultato_finale'
-    cv2.imshow('Risultato', risultato_finale)
+    # 6. Show the 'final_result'
+    cv2.imshow('Result', risultato_finale)
     
-    # --- FINE LOGICA DI ELABORAZIONE ---
+    # --- END OF PROCESSING LOGIC ---
 
-    # !!! IMPORTANTE: CANCELLA O COMMENTA la vecchia riga 'cv2.imshow'!!!
+    # !!! IMPORTANT: DELETE OR COMMENT OUT the old 'cv2.imshow' line!!!
     # cv2.imshow('Video Originale', frame)
     
-    # Per ora, mostriamo solo il frame originale (CANCELLA/COMMENTA QUESTA RIGA QUANDO MOSTRI IL RISULTATO)
+    # For now, just show the original frame (DELETE/COMMENT THIS LINE WHEN SHOWING THE RESULT)
     #cv2.imshow('Video Originale', masked_image) 
 
 
-    # --- FINE LOGICA DI ELABORAZIONE ---
+    # --- END OF PROCESSING LOGIC ---
 
-    # Premi 'q' per uscire (attende 1 millisecondo)
+    # Press 'q' to exit (waits 1 millisecond)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# --- PASSO FINALE: RILASCIO E CHIUSURA ---
+# --- FINAL STEP: RELEASE AND CLOSE ---
 cap.release()
 cv2.destroyAllWindows()
