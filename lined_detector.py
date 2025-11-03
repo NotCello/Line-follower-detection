@@ -68,7 +68,7 @@ while cap.isOpened():
     
     # 3. Rilevamento Bordi con Canny (cv2.Canny)
     #    canny = cv2.Canny(blur, 50, 150) # Dovrai regolare le soglie 50 e 150
-    canny=cv2.Canny(blur,10,90)
+    canny=cv2.Canny(blur,50,150)
     # 4. (Opzionale) Mostra l'output di Canny per il debug
     cv2.imshow('Canny Output', canny)
 
@@ -83,8 +83,8 @@ while cap.isOpened():
     polygon = np.array([
         (0, height),              # Angolo in basso a sinistra
         (width, height),          # Angolo in basso a destra
-        (width*0.55, height*0.4), # Punto in alto a destra della corsia (circa)
-        (width*0.45, height*0.4)  # Punto in alto a sinistra della corsia (circa)
+        (width*0.55, height*0.5), # Punto in alto a destra della corsia (circa)
+        (width*0.45, height*0.5)  # Punto in alto a sinistra della corsia (circa)
     ], dtype=np.int32)
     
     # 2. Crea una maschera nera grande come l'immagine Canny (np.zeros_like)
@@ -103,56 +103,52 @@ while cap.isOpened():
     # === PASSO 3: RILEVAMENTO LINEE (HOUGH TRANSFORM) ===
     # L'obiettivo è trovare tutti i segmenti di linea retta nell'immagine ROI.
     
-    lines = cv2.HoughLinesP(masked_image, rho=2, theta=np.pi/180, threshold=100, minLineLength=40, maxLineGap=5)
+    lines = cv2.HoughLinesP(masked_image, rho=2, theta=np.pi/180, threshold=50, minLineLength=20, maxLineGap=50)
     # (Dovrai regolare 'threshold', 'minLineLength' e 'maxLineGap' per trovare le linee giuste)
 
 
     # === PASSO 4: LOGICA DI MEDIA E FILTRAGGIO ===
-    # L'obiettivo è ridurre le decine di segmenti trovati a solo DUE linee: sinistra e destra.
     
-    # 1. Crea due liste: 'segmenti_sinistri' e 'segmenti_destri'
     left_segment = []
     right_Segment = []
     
-    # 2. Itera su 'lines' (prima controlla che 'lines' non sia None!)
-    #    - Calcola la pendenza (slope) di ogni segmento: (y2 - y1) / (x2 - x1)
-    #    - Se pendenza < -0.3 (circa) -> aggiungi coordinate/pendenza a 'segmenti_sinistri'
-    #    - Se pendenza > 0.3 (circa) -> aggiungi coordinate/pendenza a 'segmenti_destri'
     if lines is not None:
-        for line in lines:
-            x1,y1,x2,y2=line[0]
+        # Inizia il loop: scorri OGNI linea trovata
+        for line in lines: 
+            x1,y1,x2,y2 = line[0]
 
-            if (x2-x1)==0:
-                continue
+            if (x2-x1) == 0:
+                continue # Salta questa linea se è verticale
  
-        slope = (y2-y1)/(x2-x1)
+            # QUESTO ORA È DENTRO IL LOOP 'for'
+            slope = (y2-y1) / (x2-x1)
 
+            # ANCHE QUESTO È DENTRO IL LOOP 'for'
+            # E CON LA LOGICA DELLA PENDENZA CORRETTA
+            if slope < -0.3: # Pendenza NEGATIVA = Linea SINISTRA
+                left_segment.append(line)
+            elif slope > 0.3: # Pendenza POSITIVA = Linea DESTRA
+                right_Segment.append(line)
+        
+        # Il loop 'for' finisce qui
 
-
-        if slope>0.3:
-            left_segment.append(line)
-        elif slope<-0.3:
-            right_Segment.append(line)
-
+    # GUARDA QUESTO PRINT NEL TERMINALE!
     print(f"segmenti Sinistri: {len(left_segment)}, Segmenti Destri: {len(right_Segment)}")
     
-    # 3. Calcola la media delle linee (es. con np.polyfit o altri metodi) per trovare
-    #    i parametri (m, q) di UNA linea sinistra e UNA linea destra.
     left_line_params = get_line_parameters(left_segment)
     right_line_params = get_line_parameters(right_Segment)
-
 
     # === PASSO 5: CALCOLO ERRORE DI STERZATA ===
     # L'obiettivo è calcolare un numero che ci dica "quanto sterzare".
     
-    # 1. Calcola il 'centro_corsia'
+    # 1. Calcola il 'centro_corsia'centro
     #    (media tra la posizione x della linea sx e dx, calcolate a una y fissa, es. in fondo allo schermo)
     #    centro_corsia = (x_sinistro + x_destro) / 2
     # === PASSO 5: CALCOLO ERRORE DI STERZATA ===
     
     # Inizializziamo i valori. Partiamo dal presupposto che il centro sia
     # il centro dell'auto, così se non troviamo le linee, l'errore è 0.
-    centro_auto = width // 2 # Usiamo // per avere un intero
+    centro_auto = (width // 2) - 80 # Usiamo // per avere un intero
     centro_corsia = centro_auto 
     
     # Controlliamo di aver trovato ENTRAMBE le linee.
@@ -178,9 +174,9 @@ while cap.isOpened():
         centro_corsia = (x_sinistro + x_destro) // 2
         
         # (Debug: puoi disegnare questi punti per vedere se sono corretti)
-        #cv2.circle(frame, (x_sinistro, y_riferimento), 10, (0, 255, 0), -1) # Verde
-        #cv2.circle(frame, (x_destro, y_riferimento), 10, (0, 0, 255), -1)   # Rosso
-        #cv2.circle(frame, (centro_corsia, y_riferimento), 10, (255, 0, 0), -1) # Blu
+        cv2.circle(frame, (x_sinistro, y_riferimento), 10, (0, 255, 0), -1) # Verde
+        cv2.circle(frame, (x_destro, y_riferimento), 10, (0, 0, 255), -1)   # Rosso
+        cv2.circle(frame, (centro_corsia, y_riferimento), 10, (255, 0, 0), -1) # Blu
 
     # Ora calcoliamo l'errore
     errore_pixel = centro_corsia - centro_auto
@@ -242,7 +238,7 @@ while cap.isOpened():
     
     # 4. Scrivi il valore di 'angolo_sterzata' sull'immagine FINALE
     #    (Lo facciamo *dopo* addWeighted così non è trasparente)
-    testo_angolo = f"Angolo Sterzata: {angolo_sterzata:.2f}"
+    testo_angolo = f"Angolo Sterzata: {angolo_sterzata:.2f} Errore pixel: {errore_pixel}"
     cv2.putText(risultato_finale, testo_angolo, 
                 (50, 50), # Posizione (x, y) dall'angolo in alto a sinistra
                 cv2.FONT_HERSHEY_SIMPLEX, 
@@ -260,7 +256,7 @@ while cap.isOpened():
     # cv2.imshow('Video Originale', frame)
     
     # Per ora, mostriamo solo il frame originale (CANCELLA/COMMENTA QUESTA RIGA QUANDO MOSTRI IL RISULTATO)
-    cv2.imshow('Video Originale', masked_image) 
+    #cv2.imshow('Video Originale', masked_image) 
 
 
     # --- FINE LOGICA DI ELABORAZIONE ---
