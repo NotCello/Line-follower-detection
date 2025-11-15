@@ -1,42 +1,42 @@
 import numpy as np
 import cv2
 
-# --- PARAMETRI DI CONFIGURAZIONE (Regola tutto da qui) ---
+# --- CONFIGURATION PARAMETERS (Tune everything from here) ---
 
-# Parametri Canny
+# Canny Parameters
 CANNY_LOW_THRESHOLD = 50
 CANNY_HIGH_THRESHOLD = 150
 
-# Parametri Gaussian Blur
+# Gaussian Blur Parameters
 BLUR_KERNEL_SIZE = (5, 5)
 
-# Parametri Hough Transform
+# Hough Transform Parameters
 HOUGH_RHO = 2
 HOUGH_THETA = np.pi/180
 HOUGH_THRESHOLD = 50
 HOUGH_MIN_LINE_LENGTH = 20
 HOUGH_MAX_LINE_GAP = 50
 
-# Parametri Filtro Pendenza (Slope)
-SLOPE_THRESHOLD_LOW = -0.3 # Per la linea sinistra (negativa)
-SLOPE_THRESHOLD_HIGH = 0.3 # Per la linea destra (positiva)
+# Slope Filter Parameters
+SLOPE_THRESHOLD_LOW = -0.3 # For the left line (negative)
+SLOPE_THRESHOLD_HIGH = 0.3 # For the right line (positive)
 
-# Parametri Poligono ROI (Valori come frazione di H e W)
-ROI_TOP_Y_RATIO = 0.5   # Y superiore del trapezio (0.5 = a metà schermo)
-ROI_TOP_X_LEFT_RATIO = 0.45 # X superiore sinistro
-ROI_TOP_X_RIGHT_RATIO = 0.55 # X superiore destro
+# ROI Polygon Parameters (Values as fractions of H and W)
+ROI_TOP_Y_RATIO = 0.5   # Top Y of the trapezoid (0.5 = half screen)
+ROI_TOP_X_LEFT_RATIO = 0.45 # Top left X
+ROI_TOP_X_RIGHT_RATIO = 0.55 # Top right X
 
-# Parametri di Controllo
-KP_GAIN = 0.1 # Guadagno proporzionale (P) del controller
+# Control Parameters
+KP_GAIN = 0.1 # Proportional (P) controller gain
 
-# Colori per la Visualizzazione
+# Visualization Colors
 COLOR_LEFT_LANE = (0, 255, 0)
 COLOR_RIGHT_LANE = (0, 255, 0)
-COLOR_CENTER_LANE = (255, 0, 0) # Blu
-COLOR_CAR_CENTER = (0, 0, 255) # Rosso
+COLOR_CENTER_LANE = (255, 0, 0) # Blue
+COLOR_CAR_CENTER = (0, 0, 255) # Red
 COLOR_TEXT = (255, 255, 255)
 
-# --- FINE CONFIGURAZIONE ---
+# --- END OF CONFIGURATION ---
 
 
 def get_line_parameters(segments):
@@ -68,19 +68,19 @@ def get_line_parameters(segments):
 
 def process_frame(frame):
     """
-    Elabora un singolo frame video per trovare le corsie, 
-    calcolare l'errore e restituire un'immagine con overlay.
+    Processes a single video frame to find lanes, 
+    calculate the error, and return an image with an overlay.
     """
     
-    # === PASSO 1: PRE-PROCESSING ===
+    # === STEP 1: PRE-PROCESSING ===
     gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray_image, BLUR_KERNEL_SIZE, 0)
     canny = cv2.Canny(blur, CANNY_LOW_THRESHOLD, CANNY_HIGH_THRESHOLD)
 
-    # === PASSO 2: REGION OF INTEREST (ROI) ===
+    # === STEP 2: REGION OF INTEREST (ROI) ===
     height, width = frame.shape[:2]
     
-    # Definisci i vertici del poligono usando i rapporti
+    # Define the polygon vertices using ratios
     y_top_roi = int(height * ROI_TOP_Y_RATIO)
     x_top_left_roi = int(width * ROI_TOP_X_LEFT_RATIO)
     x_top_right_roi = int(width * ROI_TOP_X_RIGHT_RATIO)
@@ -96,7 +96,7 @@ def process_frame(frame):
     cv2.fillPoly(mask, [polygon], 255)
     masked_image = cv2.bitwise_and(canny, mask)
 
-    # === PASSO 3: HOUGH TRANSFORM ===
+    # === STEP 3: HOUGH TRANSFORM ===
     lines = cv2.HoughLinesP(masked_image, 
                             rho=HOUGH_RHO, 
                             theta=HOUGH_THETA, 
@@ -104,9 +104,9 @@ def process_frame(frame):
                             minLineLength=HOUGH_MIN_LINE_LENGTH, 
                             maxLineGap=HOUGH_MAX_LINE_GAP)
 
-    # === PASSO 4: AVERAGING AND FILTERING LOGIC ===
+    # === STEP 4: AVERAGING AND FILTERING LOGIC ===
     left_segment = []
-    right_segment = [] # Corretto da right_Segment
+    right_segment = [] # Corrected from right_Segment
     
     if lines is not None:
         for line in lines: 
@@ -123,9 +123,9 @@ def process_frame(frame):
     left_line_params = get_line_parameters(left_segment)
     right_line_params = get_line_parameters(right_segment)
 
-    # === PASSO 5: STEERING ERROR CALCULATION ===
+    # === STEP 5: STEERING ERROR CALCULATION ===
     
-    # Centro auto REALE (non per debug)
+    # REAL car center (not for debug)
     centro_auto = width // 2 
     centro_corsia = centro_auto 
     
@@ -143,11 +143,11 @@ def process_frame(frame):
     errore_pixel = centro_corsia - centro_auto
     angolo_sterzata = KP_GAIN * errore_pixel
 
-    # === PASSO 6: VISUALIZATION ===
+    # === STEP 6: VISUALIZATION ===
     
     overlay_image = np.zeros_like(frame)
     y_bottom = height
-    # Usa la stessa Y del poligono ROI per disegnare
+    # Use the same Y as the ROI polygon for drawing
     y_top_draw = y_top_roi 
 
     if left_line_params is not None:
@@ -162,24 +162,24 @@ def process_frame(frame):
         x2_right = int((m_right * y_top_draw) + b_right)
         cv2.line(overlay_image, (x1_right, y_bottom), (x2_right, y_top_draw), COLOR_RIGHT_LANE, 10)
 
-    # Disegna linea centro auto
+    # Draw car center line
     cv2.line(overlay_image, (centro_auto, y_bottom), (centro_auto, y_top_draw), COLOR_CAR_CENTER, 3)
     
-    # Disegna linea centro corsia (se trovata)
+    # Draw lane center line (if found)
     if centro_corsia != centro_auto:
         cv2.line(overlay_image, (centro_corsia, y_bottom), (centro_corsia, y_top_draw), COLOR_CENTER_LANE, 3)
     
-    # Combina l'overlay con il frame originale
+    # Combine the overlay with the original frame
     risultato_finale = cv2.addWeighted(frame, 0.8, overlay_image, 1.0, 0)
     
-    # Aggiungi testo
+    # Add text
     testo = f"Steering Angle: {angolo_sterzata:.2f} | Pixel Error: {errore_pixel}"
     cv2.putText(risultato_finale, testo, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, COLOR_TEXT, 2, cv2.LINE_AA)
     
-    # --- RITORNA I RISULTATI ---
-    # Il tuo main si aspetta questi 3 valori
+    # --- RETURN THE RESULTS ---
+    # Your main expects these 3 values
     
-    # (Per debug futuro, potresti ritornare anche 'canny' e 'masked_image')
+    # (For future debugging, you could also return 'canny' and 'masked_image')
     # return risultato_finale, angolo_sterzata, errore_pixel, canny, masked_image
     
     return risultato_finale, angolo_sterzata, errore_pixel

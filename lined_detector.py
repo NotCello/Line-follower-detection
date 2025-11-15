@@ -1,58 +1,58 @@
 import cv2
-import lane_utils  # Importa il tuo nuovo file di utilità
+import lane_utils  # Import your new utility file
 
-# --- CONFIGURAZIONE ---
-# Per usare la webcam, cambia 'video_path' in 0
-# Per usare il video, metti il percorso del file
+# --- CONFIGURATION ---
+# To use the webcam, change 'video_path' to 0
+# To use a video, set the file path
 video_path = 'TestVideo/test_lane_detector.mp4'
-# video_path = 0 # Esempio per webcam
+# video_path = 0 # Example for webcam
 
-# --- PASSO 0: SETUP E CARICAMENTO ---
+# --- STEP 0: SETUP AND LOADING ---
 cap = cv2.VideoCapture(video_path)
 
 if not cap.isOpened():
-    print(f"Errore: Impossibile aprire la fonte video: {video_path}")
+    print(f"Error: Unable to open video source: {video_path}")
     exit()
 
-print("Avvio elaborazione... Premi 'q' per uscire.")
+print("Processing started... Press 'q' to exit.")
 
 while cap.isOpened():
-    # 'ret' è un booleano (True se il frame è stato letto correttamente)
-    # 'frame' è l'immagine
+    # 'ret' is a boolean (True if frame was read correctly)
+    # 'frame' is the image
     ret, frame = cap.read()
 
     if not ret:
         if video_path != 0:
-            print("Fine del video.")
+            print("End of video.")
             break
         else:
-            print("Errore lettura webcam, esco.")
+            print("Error reading webcam, exiting.")
             break
 
-    # --- ELABORAZIONE ---
-    # Tutta la complessità è nascosta in questa singola funzione!
+    # --- PROCESSING ---
+    # All the complexity is hidden in this single function!
     try:
-        # Passiamo il frame alla nostra utility e riceviamo i risultati
+        # We pass the frame to our utility and receive the results
         img_risultato, angolo, errore = lane_utils.process_frame(frame)
         
-        # Stampa i dati sul terminale
-        print(f"Errore Pixel: {errore}, Angolo: {angolo:.2f}")
+        # Print data to the terminal
+        print(f"Pixel Error: {errore}, Angle: {angolo:.2f}")
 
-        # Mostra solo l'immagine finale
-        cv2.imshow('Risultato', img_risultato)
+        # Show only the final image
+        cv2.imshow('Result', img_risultato)
 
     except Exception as e:
-        # Gestisce eventuali errori nell'elaborazione (es. frame corrotti)
-        print(f"Errore durante l'elaborazione del frame: {e}")
-        # Mostra il frame originale in caso di errore per non crashare
-        cv2.imshow('Risultato', frame) 
+        # Handles any processing errors (e.g., corrupted frames)
+        print(f"Error during frame processing: {e}")
+        # Show the original frame in case of error to avoid crashing
+        cv2.imshow('Result', frame) 
 
-    # --- CONTROLLO USCITA ---
-    # Premi 'q' per uscire (attende 1 millisecondo)
+    # --- EXIT CONTROL ---
+    # Press 'q' to exit (waits 1 millisecond)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# --- PASSO FINALE: RILASCIO E CHIUSURA ---
-print("Chiusura...")
+# --- FINAL STEP: RELEASE AND CLOSE ---
+print("Closing...")
 cap.release()
 cv2.destroyAllWindows()
