@@ -1,5 +1,13 @@
 # Lane Detection & Steering Angle Estimation
 
+## 🎥 Demo Video
+
+Watch the lane detection algorithm in action:
+
+[![Watch the video](https://img.youtube.com/vi/4gZvpw_GFn4/maxresdefault.jpg)](https://youtu.be/4gZvpw_GFn4)
+
+*(Click the image above to watch the video on YouTube)*
+
 This project is a Python and OpenCV implementation of a lane detection algorithm for autonomous navigation. The primary goal is to process a dashcam video feed, identify lane lines, calculate the center of the lane, and estimate the steering angle required to keep the vehicle centered.
 
 This is a fundamental algorithm for developing Advanced Driver-Assistance Systems (ADAS) and Autonomous Guided Vehicles (AGV), applicable to road, agricultural, and industrial environments.
