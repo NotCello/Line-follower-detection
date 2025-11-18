@@ -2,7 +2,7 @@
 
 ## 🎥 Demo Video
 
-![Lane Detection Demo](https://github.com/NotCello/Line-follower-detection/blob/main/assets/my-demo.gif?raw=true)
+![Alt Text for your GIF](/video_test.gif)
 
 Watch the lane detection algorithm in action:
 
