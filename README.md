@@ -2,6 +2,8 @@
 
 ## 🎥 Demo Video
 
+file:///home/utente/Documenti/PersonalProject/LineFollower/TestVideo/video_test.gif
+
 Watch the lane detection algorithm in action:
 
 [![Watch the video](https://img.youtube.com/vi/4gZvpw_GFn4/maxresdefault.jpg)](https://youtu.be/4gZvpw_GFn4)
